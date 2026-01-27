@@ -17,7 +17,7 @@ import type { HttpMethod, PathsWithMethod } from "openapi-typescript-helpers"
  * @invariant Result ⊆ paths
  */
 export type PathsForMethod<
-  Paths extends Record<string, unknown>,
+  Paths extends object,
   Method extends HttpMethod
 > = PathsWithMethod<Paths, Method>
 
@@ -28,7 +28,7 @@ export type PathsForMethod<
  * @invariant ∀ path ∈ Paths, method ∈ Methods: Operation<Paths, path, method> = Paths[path][method]
  */
 export type OperationFor<
-  Paths extends Record<string, unknown>,
+  Paths extends object,
   Path extends keyof Paths,
   Method extends HttpMethod
 > = Method extends keyof Paths[Path] ? Paths[Path][Method] : never
@@ -56,10 +56,8 @@ export type StatusCodes<Responses> = keyof Responses & (number | string)
 export type ContentTypesFor<
   Responses,
   Status extends StatusCodes<Responses>
-> = Status extends keyof Responses
-  ? Responses[Status] extends { content: infer C }
-    ? keyof C & string
-    : "none"
+> = Status extends keyof Responses ? Responses[Status] extends { content: infer C } ? keyof C & string
+  : "none"
   : never
 
 /**
@@ -73,13 +71,10 @@ export type BodyFor<
   Status extends StatusCodes<Responses>,
   ContentType extends ContentTypesFor<Responses, Status>
 > = Status extends keyof Responses
-  ? Responses[Status] extends { content: infer C }
-    ? ContentType extends keyof C
-      ? C[ContentType]
-      : never
-    : ContentType extends "none"
-    ? void
+  ? Responses[Status] extends { content: infer C } ? ContentType extends keyof C ? C[ContentType]
     : never
+  : ContentType extends "none" ? undefined
+  : never
   : never
 
 /**
@@ -106,11 +101,10 @@ export type ResponseVariant<
 type AllResponseVariants<Responses> = StatusCodes<Responses> extends infer Status
   ? Status extends StatusCodes<Responses>
     ? ContentTypesFor<Responses, Status> extends infer CT
-      ? CT extends ContentTypesFor<Responses, Status>
-        ? ResponseVariant<Responses, Status, CT>
-        : never
+      ? CT extends ContentTypesFor<Responses, Status> ? ResponseVariant<Responses, Status, CT>
       : never
     : never
+  : never
   : never
 
 /**
@@ -121,10 +115,9 @@ type AllResponseVariants<Responses> = StatusCodes<Responses> extends infer Statu
  */
 export type SuccessVariants<Responses> = AllResponseVariants<Responses> extends infer V
   ? V extends ResponseVariant<Responses, infer S, infer CT>
-    ? S extends 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226
-      ? ResponseVariant<Responses, S, CT>
-      : never
+    ? S extends 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226 ? ResponseVariant<Responses, S, CT>
     : never
+  : never
   : never
 
 /**
@@ -135,10 +128,9 @@ export type SuccessVariants<Responses> = AllResponseVariants<Responses> extends 
  */
 export type HttpErrorVariants<Responses> = AllResponseVariants<Responses> extends infer V
   ? V extends ResponseVariant<Responses, infer S, infer CT>
-    ? S extends 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226
-      ? never
-      : ResponseVariant<Responses, S, CT>
-    : never
+    ? S extends 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226 ? never
+    : ResponseVariant<Responses, S, CT>
+  : never
   : never
 
 /**
@@ -178,7 +170,7 @@ export type DecodeError = {
   readonly _tag: "DecodeError"
   readonly status: number
   readonly contentType: string
-  readonly error: unknown
+  readonly error: Error
   readonly body: string
 }
 

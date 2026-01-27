@@ -10,8 +10,8 @@
 export type {
   ApiFailure,
   ApiSuccess,
-  BoundaryError,
   BodyFor,
+  BoundaryError,
   ContentTypesFor,
   DecodeError,
   HttpErrorVariants,

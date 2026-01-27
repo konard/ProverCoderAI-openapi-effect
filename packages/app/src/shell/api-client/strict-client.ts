@@ -5,10 +5,13 @@
 // SOURCE: n/a
 // FORMAT THEOREM: ∀ req ∈ Requests: execute(req) → Effect<Success, Failure, never>
 // PURITY: SHELL
-// EFFECT: Effect<ApiSuccess<Op>, ApiFailure<Op>, never>
+// EFFECT: Effect<ApiSuccess<Op>, ApiFailure<Op>, HttpClient.HttpClient>
 // INVARIANT: No exceptions escape; all errors typed in Effect channel
 // COMPLEXITY: O(1) per request / O(n) for body size
 
+import * as HttpBody from "@effect/platform/HttpBody"
+import * as HttpClient from "@effect/platform/HttpClient"
+import * as HttpClientRequest from "@effect/platform/HttpClientRequest"
 import { Effect } from "effect"
 import type { HttpMethod } from "openapi-typescript-helpers"
 
@@ -45,7 +48,7 @@ export type Decoder<T> = (
   status: number,
   contentType: string,
   body: string
-) => Effect.Effect<T, DecodeError, never>
+) => Effect.Effect<T, DecodeError>
 
 /**
  * Dispatcher classifies response and applies decoder
@@ -58,8 +61,7 @@ export type Dispatcher<Responses> = (
   response: RawResponse
 ) => Effect.Effect<
   ApiSuccess<Responses> | HttpErrorVariants<Responses>,
-  Exclude<BoundaryError, TransportError>,
-  never
+  Exclude<BoundaryError, TransportError>
 >
 
 /**
@@ -81,7 +83,7 @@ export type StrictRequestInit<Responses> = {
  * @returns Effect with typed success and all possible failures
  *
  * @pure false - performs HTTP request
- * @effect Effect<ApiSuccess<Responses>, ApiFailure<Responses>, never>
+ * @effect Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient>
  * @invariant No exceptions escape; all errors in Effect.fail channel
  * @precondition config.dispatcher handles all schema statuses
  * @postcondition ∀ response: classified ∨ BoundaryError
@@ -89,43 +91,105 @@ export type StrictRequestInit<Responses> = {
  */
 export const executeRequest = <Responses>(
   config: StrictRequestInit<Responses>
-): Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, never> =>
-  Effect.gen(function* () {
-    // STEP 1: Execute transport with exception handling
-    const rawResponse = yield* Effect.tryPromise({
-      try: async (): Promise<RawResponse> => {
-        const fetchInit: RequestInit = {
-          method: config.method
-        }
-        if (config.headers !== undefined) {
-          fetchInit.headers = config.headers
-        }
-        if (config.body !== undefined) {
-          fetchInit.body = config.body
-        }
-        if (config.signal !== undefined) {
-          fetchInit.signal = config.signal
-        }
+): Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient> =>
+  Effect.gen(function*() {
+    // STEP 1: Get HTTP client from context
+    const client = yield* HttpClient.HttpClient
 
-        const response = await fetch(config.url, fetchInit)
+    // STEP 2: Build request based on method
+    const request = buildRequest(config)
 
-        const text = await response.text()
-
+    // STEP 3: Execute request with error mapping
+    const rawResponse = yield* Effect.mapError(
+      Effect.gen(function*() {
+        const response = yield* client.execute(request)
+        const text = yield* response.text
         return {
           status: response.status,
-          headers: response.headers,
+          headers: toNativeHeaders(response.headers),
           text
-        }
-      },
-      catch: (error): TransportError => ({
+        } as RawResponse
+      }),
+      (error): TransportError => ({
         _tag: "TransportError",
         error: error instanceof Error ? error : new Error(String(error))
       })
-    })
+    )
 
-    // STEP 2: Delegate classification to dispatcher (handles status/content-type/decode)
+    // STEP 4: Delegate classification to dispatcher (handles status/content-type/decode)
     return yield* config.dispatcher(rawResponse)
   })
+
+/**
+ * Build HTTP request from config
+ *
+ * @pure true
+ */
+const buildRequest = <Responses>(config: StrictRequestInit<Responses>): HttpClientRequest.HttpClientRequest => {
+  const methodMap: Record<string, (url: string) => HttpClientRequest.HttpClientRequest> = {
+    get: HttpClientRequest.get,
+    post: HttpClientRequest.post,
+    put: HttpClientRequest.put,
+    patch: HttpClientRequest.patch,
+    delete: HttpClientRequest.del,
+    head: HttpClientRequest.head,
+    options: HttpClientRequest.options
+  }
+
+  const createRequest = methodMap[config.method] ?? HttpClientRequest.get
+  let request = createRequest(config.url)
+
+  // Add headers if provided
+  if (config.headers !== undefined) {
+    const headers = toRecordHeaders(config.headers)
+    request = HttpClientRequest.setHeaders(request, headers)
+  }
+
+  // Add body if provided
+  if (config.body !== undefined) {
+    const bodyText = typeof config.body === "string" ? config.body : JSON.stringify(config.body)
+    request = HttpClientRequest.setBody(request, HttpBody.text(bodyText))
+  }
+
+  return request
+}
+
+/**
+ * Convert Headers to Record<string, string>
+ *
+ * @pure true
+ */
+const toRecordHeaders = (headers: HeadersInit): Record<string, string> => {
+  if (headers instanceof Headers) {
+    const result: Record<string, string> = {}
+    for (const [key, value] of headers.entries()) {
+      result[key] = value
+    }
+    return result
+  }
+  if (Array.isArray(headers)) {
+    const result: Record<string, string> = {}
+    for (const headerPair of headers) {
+      const [headerKey, headerValue] = headerPair
+      result[headerKey] = headerValue
+    }
+    return result
+  }
+  return headers
+}
+
+/**
+ * Convert @effect/platform Headers to native Headers
+ *
+ * @pure true
+ */
+const toNativeHeaders = (platformHeaders: { readonly [key: string]: string }): Headers => {
+  const headers = new Headers()
+  for (const [key, value] of Object.entries(platformHeaders)) {
+    headers.set(key, value)
+  }
+  return headers
+}
 
 /**
  * Helper to create dispatcher from switch-based classifier
@@ -140,35 +204,38 @@ export const executeRequest = <Responses>(
  * @pure true - returns pure function
  * @complexity O(1)
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export const createDispatcher = <Responses = any>(
   classify: (
     status: number,
     contentType: string | undefined,
     text: string
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ) => Effect.Effect<any, any, never>
+  ) => Effect.Effect<any, any>
 ): Dispatcher<Responses> => {
   return ((response: RawResponse) => {
     const contentType = response.headers.get("content-type") ?? undefined
     return classify(response.status, contentType, response.text)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }) as any as Dispatcher<Responses>
 }
+
+/**
+ * JSON value type - result of JSON.parse()
+ */
+type Json = null | boolean | number | string | ReadonlyArray<Json> | { readonly [k: string]: Json }
 
 /**
  * Helper to parse JSON with error handling
  *
  * @pure false - performs parsing
- * @effect Effect<unknown, ParseError, never>
+ * @effect Effect<Json, ParseError, never>
  */
 export const parseJSON = (
   status: number,
   contentType: string,
   text: string
-): Effect.Effect<unknown, ParseError, never> =>
+): Effect.Effect<Json, ParseError> =>
   Effect.try({
-    try: () => JSON.parse(text) as unknown,
+    try: () => JSON.parse(text) as Json,
     catch: (error): ParseError => ({
       _tag: "ParseError",
       status,
@@ -211,15 +278,16 @@ export const unexpectedContentType = (
  * Generic client interface for any OpenAPI schema
  *
  * @pure false - performs HTTP requests
+ * @effect Effect<ApiSuccess<Op>, ApiFailure<Op>, HttpClient.HttpClient>
  */
-export type StrictClient<Paths extends Record<string, unknown>> = {
+export type StrictClient<Paths extends object> = {
   readonly GET: <Path extends keyof Paths>(
     path: Path,
     options: RequestOptions<Paths, Path, "get">
   ) => Effect.Effect<
     ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "get">>>,
     ApiFailure<ResponsesFor<OperationFor<Paths, Path, "get">>>,
-    never
+    HttpClient.HttpClient
   >
 
   readonly POST: <Path extends keyof Paths>(
@@ -228,7 +296,7 @@ export type StrictClient<Paths extends Record<string, unknown>> = {
   ) => Effect.Effect<
     ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "post">>>,
     ApiFailure<ResponsesFor<OperationFor<Paths, Path, "post">>>,
-    never
+    HttpClient.HttpClient
   >
 
   readonly PUT: <Path extends keyof Paths>(
@@ -237,7 +305,7 @@ export type StrictClient<Paths extends Record<string, unknown>> = {
   ) => Effect.Effect<
     ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "put">>>,
     ApiFailure<ResponsesFor<OperationFor<Paths, Path, "put">>>,
-    never
+    HttpClient.HttpClient
   >
 
   readonly PATCH: <Path extends keyof Paths>(
@@ -246,7 +314,7 @@ export type StrictClient<Paths extends Record<string, unknown>> = {
   ) => Effect.Effect<
     ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "patch">>>,
     ApiFailure<ResponsesFor<OperationFor<Paths, Path, "patch">>>,
-    never
+    HttpClient.HttpClient
   >
 
   readonly DELETE: <Path extends keyof Paths>(
@@ -255,7 +323,7 @@ export type StrictClient<Paths extends Record<string, unknown>> = {
   ) => Effect.Effect<
     ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "delete">>>,
     ApiFailure<ResponsesFor<OperationFor<Paths, Path, "delete">>>,
-    never
+    HttpClient.HttpClient
   >
 }
 
@@ -263,7 +331,7 @@ export type StrictClient<Paths extends Record<string, unknown>> = {
  * Request options for a specific operation
  */
 export type RequestOptions<
-  Paths extends Record<string, unknown>,
+  Paths extends object,
   Path extends keyof Paths,
   Method extends HttpMethod
 > = {
@@ -282,7 +350,7 @@ export type RequestOptions<
  * @pure true - returns pure client object
  * @complexity O(1)
  */
-export const createStrictClient = <Paths extends Record<string, unknown>>(): StrictClient<
+export const createStrictClient = <Paths extends object>(): StrictClient<
   Paths
 > => {
   const makeRequest = <Path extends keyof Paths, Method extends HttpMethod>(

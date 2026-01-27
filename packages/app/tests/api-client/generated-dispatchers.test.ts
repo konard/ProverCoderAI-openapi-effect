@@ -9,317 +9,305 @@
 // INVARIANT: All schema statuses handled, unexpected cases return boundary errors
 // COMPLEXITY: O(1) per test
 
-import { Effect, Either } from "effect"
-import { describe, expect, it, vi } from "vitest"
+import * as HttpClient from "@effect/platform/HttpClient"
+import * as HttpClientResponse from "@effect/platform/HttpClientResponse"
+import { Effect, Either, Layer } from "effect"
+import { describe, expect, it } from "vitest"
 
+import {
+  dispatchercreatePet,
+  dispatcherdeletePet,
+  dispatchergetPet,
+  dispatcherlistPets
+} from "../../src/generated/dispatch.js"
 import { createStrictClient } from "../../src/shell/api-client/strict-client.js"
-import type { paths } from "../fixtures/petstore.openapi.js"
-import { dispatcherlistPets, dispatchercreatePet, dispatchergetPet, dispatcherdeletePet } from "../../src/generated/dispatch.js"
+import type { Paths } from "../fixtures/petstore.openapi.js"
 
-type PetstorePaths = paths & Record<string, unknown>
+type PetstorePaths = Paths & object
+
+/**
+ * Create a mock HttpClient layer that returns a fixed response
+ * Note: 204 and 304 responses cannot have a body per HTTP spec
+ *
+ * @pure true - returns pure layer
+ */
+const createMockHttpClientLayer = (
+  status: number,
+  headers: Record<string, string>,
+  body: string
+): Layer.Layer<HttpClient.HttpClient> =>
+  Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make(
+      (request) =>
+        Effect.succeed(
+          HttpClientResponse.fromWeb(
+            request,
+            // 204 and 304 responses cannot have a body
+            status === 204 || status === 304
+              ? new Response(null, { status, headers: new Headers(headers) })
+              : new Response(body, { status, headers: new Headers(headers) })
+          )
+        )
+    )
+  )
 
 describe("Generated dispatcher: listPets", () => {
-  it("should handle 200 success response", async () => {
-    const successBody = JSON.stringify([
-      { id: "1", name: "Fluffy" },
-      { id: "2", name: "Spot" }
-    ])
+  it("should handle 200 success response", () =>
+    Effect.gen(function*() {
+      const successBody = JSON.stringify([
+        { id: "1", name: "Fluffy" },
+        { id: "2", name: "Spot" }
+      ])
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 200,
-      headers: new Headers({ "content-type": "application/json" }),
-      text: async () => successBody
-    })
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.GET("/pets", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatcherlistPets
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(200, { "content-type": "application/json" }, successBody)
+          )
+        )
       )
-    )
 
-    expect(Either.isRight(result)).toBe(true)
-    if (Either.isRight(result)) {
-      expect(result.right.status).toBe(200)
-      expect(result.right.contentType).toBe("application/json")
-      expect(Array.isArray(result.right.body)).toBe(true)
-    }
-  })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.status).toBe(200)
+        expect(result.right.contentType).toBe("application/json")
+        expect(Array.isArray(result.right.body)).toBe(true)
+      }
+    }).pipe(Effect.runPromise))
 
-  it("should handle 500 error response", async () => {
-    const errorBody = JSON.stringify({ code: 500, message: "Internal server error" })
+  it("should handle 500 error response", () =>
+    Effect.gen(function*() {
+      const errorBody = JSON.stringify({ code: 500, message: "Internal server error" })
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 500,
-      headers: new Headers({ "content-type": "application/json" }),
-      text: async () => errorBody
-    })
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.GET("/pets", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatcherlistPets
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(500, { "content-type": "application/json" }, errorBody)
+          )
+        )
       )
-    )
 
-    // 500 is in schema, so it's a typed error (not BoundaryError)
-    expect(Either.isRight(result)).toBe(true)
-    if (Either.isRight(result)) {
-      expect(result.right.status).toBe(500)
-      expect(result.right.contentType).toBe("application/json")
-    }
-  })
+      // 500 is in schema, so it's a typed error (not BoundaryError)
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.status).toBe(500)
+        expect(result.right.contentType).toBe("application/json")
+      }
+    }).pipe(Effect.runPromise))
 
-  it("should return UnexpectedStatus for 404 (not in schema)", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 404,
-      headers: new Headers({ "content-type": "application/json" }),
-      text: async () => JSON.stringify({ message: "Not found" })
-    })
+  it("should return UnexpectedStatus for 404 (not in schema)", () =>
+    Effect.gen(function*() {
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.GET("/pets", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatcherlistPets
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(
+              404,
+              { "content-type": "application/json" },
+              JSON.stringify({ message: "Not found" })
+            )
+          )
+        )
       )
-    )
 
-    expect(Either.isLeft(result)).toBe(true)
-    if (Either.isLeft(result)) {
-      expect(result.left).toMatchObject({
-        _tag: "UnexpectedStatus",
-        status: 404
-      })
-    }
-  })
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({
+          _tag: "UnexpectedStatus",
+          status: 404
+        })
+      }
+    }).pipe(Effect.runPromise))
 })
 
 describe("Generated dispatcher: createPet", () => {
-  it("should handle 201 created response", async () => {
-    const createdPet = JSON.stringify({ id: "123", name: "Rex" })
+  it("should handle 201 created response", () =>
+    Effect.gen(function*() {
+      const createdPet = JSON.stringify({ id: "123", name: "Rex" })
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 201,
-      headers: new Headers({ "content-type": "application/json" }),
-      text: async () => createdPet
-    })
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.POST("/pets", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatchercreatePet,
           body: JSON.stringify({ name: "Rex" })
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(201, { "content-type": "application/json" }, createdPet)
+          )
+        )
       )
-    )
 
-    expect(Either.isRight(result)).toBe(true)
-    if (Either.isRight(result)) {
-      expect(result.right.status).toBe(201)
-      expect(result.right.contentType).toBe("application/json")
-    }
-  })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.status).toBe(201)
+        expect(result.right.contentType).toBe("application/json")
+      }
+    }).pipe(Effect.runPromise))
 
-  it("should handle 400 validation error", async () => {
-    const errorBody = JSON.stringify({ code: 400, message: "Validation failed" })
+  it("should handle 400 validation error", () =>
+    Effect.gen(function*() {
+      const errorBody = JSON.stringify({ code: 400, message: "Validation failed" })
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 400,
-      headers: new Headers({ "content-type": "application/json" }),
-      text: async () => errorBody
-    })
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.POST("/pets", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatchercreatePet,
           body: JSON.stringify({ name: "" })
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(400, { "content-type": "application/json" }, errorBody)
+          )
+        )
       )
-    )
 
-    expect(Either.isRight(result)).toBe(true)
-    if (Either.isRight(result)) {
-      expect(result.right.status).toBe(400)
-    }
-  })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.status).toBe(400)
+      }
+    }).pipe(Effect.runPromise))
 
-  it("should handle 500 error", async () => {
-    const errorBody = JSON.stringify({ code: 500, message: "Server error" })
+  it("should handle 500 error", () =>
+    Effect.gen(function*() {
+      const errorBody = JSON.stringify({ code: 500, message: "Server error" })
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 500,
-      headers: new Headers({ "content-type": "application/json" }),
-      text: async () => errorBody
-    })
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.POST("/pets", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatchercreatePet,
           body: JSON.stringify({ name: "Test" })
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(500, { "content-type": "application/json" }, errorBody)
+          )
+        )
       )
-    )
 
-    expect(Either.isRight(result)).toBe(true)
-    if (Either.isRight(result)) {
-      expect(result.right.status).toBe(500)
-    }
-  })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.status).toBe(500)
+      }
+    }).pipe(Effect.runPromise))
 })
 
 describe("Generated dispatcher: getPet", () => {
-  it("should handle 200 success with pet data", async () => {
-    const pet = JSON.stringify({ id: "42", name: "Buddy", tag: "dog" })
+  it("should handle 200 success with pet data", () =>
+    Effect.gen(function*() {
+      const pet = JSON.stringify({ id: "42", name: "Buddy", tag: "dog" })
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 200,
-      headers: new Headers({ "content-type": "application/json" }),
-      text: async () => pet
-    })
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.GET("/pets/{petId}", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatchergetPet,
           params: { petId: "42" }
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(200, { "content-type": "application/json" }, pet)
+          )
+        )
       )
-    )
 
-    expect(Either.isRight(result)).toBe(true)
-    if (Either.isRight(result)) {
-      expect(result.right.status).toBe(200)
-    }
-  })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.status).toBe(200)
+      }
+    }).pipe(Effect.runPromise))
 
-  it("should handle 404 not found", async () => {
-    const errorBody = JSON.stringify({ code: 404, message: "Pet not found" })
+  it("should handle 404 not found", () =>
+    Effect.gen(function*() {
+      const errorBody = JSON.stringify({ code: 404, message: "Pet not found" })
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 404,
-      headers: new Headers({ "content-type": "application/json" }),
-      text: async () => errorBody
-    })
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.GET("/pets/{petId}", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatchergetPet,
           params: { petId: "999" }
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(404, { "content-type": "application/json" }, errorBody)
+          )
+        )
       )
-    )
 
-    expect(Either.isRight(result)).toBe(true)
-    if (Either.isRight(result)) {
-      expect(result.right.status).toBe(404)
-    }
-  })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.status).toBe(404)
+      }
+    }).pipe(Effect.runPromise))
 })
 
 describe("Generated dispatcher: deletePet", () => {
-  it("should handle 204 no content", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 204,
-      headers: new Headers(),
-      text: async () => ""
-    })
+  it("should handle 204 no content", () =>
+    Effect.gen(function*() {
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.DELETE("/pets/{petId}", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatcherdeletePet,
           params: { petId: "42" }
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(204, {}, "")
+          )
+        )
       )
-    )
 
-    expect(Either.isRight(result)).toBe(true)
-    if (Either.isRight(result)) {
-      expect(result.right.status).toBe(204)
-      expect(result.right.contentType).toBe("none")
-      expect(result.right.body).toBeUndefined()
-    }
-  })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.status).toBe(204)
+        expect(result.right.contentType).toBe("none")
+        expect(result.right.body).toBeUndefined()
+      }
+    }).pipe(Effect.runPromise))
 
-  it("should handle 404 pet not found", async () => {
-    const errorBody = JSON.stringify({ code: 404, message: "Pet not found" })
+  it("should handle 404 pet not found", () =>
+    Effect.gen(function*() {
+      const errorBody = JSON.stringify({ code: 404, message: "Pet not found" })
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      status: 404,
-      headers: new Headers({ "content-type": "application/json" }),
-      text: async () => errorBody
-    })
+      const client = createStrictClient<PetstorePaths>()
 
-    global.fetch = mockFetch as typeof fetch
-
-    const client = createStrictClient<PetstorePaths>()
-
-    const result = await Effect.runPromise(
-      Effect.either(
+      const result = yield* Effect.either(
         client.DELETE("/pets/{petId}", {
           baseUrl: "https://api.example.com",
           dispatcher: dispatcherdeletePet,
           params: { petId: "999" }
-        })
+        }).pipe(
+          Effect.provide(
+            createMockHttpClientLayer(404, { "content-type": "application/json" }, errorBody)
+          )
+        )
       )
-    )
 
-    expect(Either.isRight(result)).toBe(true)
-    if (Either.isRight(result)) {
-      expect(result.right.status).toBe(404)
-    }
-  })
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(result.right.status).toBe(404)
+      }
+    }).pipe(Effect.runPromise))
 })
 
 /**

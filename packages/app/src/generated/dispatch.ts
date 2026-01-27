@@ -7,11 +7,45 @@
 // PURITY: SHELL
 // EFFECT: Effect<Success | HttpError, BoundaryError, never>
 // INVARIANT: Exhaustive coverage of all schema statuses and content-types
-// COMPLEXITY: O(1) per dispatch (switch lookup)
+// COMPLEXITY: O(1) per dispatch (Match lookup)
 
-import { Effect } from "effect"
-import { createDispatcher, parseJSON, unexpectedContentType, unexpectedStatus } from "../shell/api-client/strict-client.js"
+import { Effect, Match } from "effect"
+import type { DecodeError } from "../core/api-client/strict-types.js"
+import {
+  createDispatcher,
+  parseJSON,
+  unexpectedContentType,
+  unexpectedStatus
+} from "../shell/api-client/strict-client.js"
 import * as Decoders from "./decoders.js"
+
+/**
+ * Helper: process JSON content type for a given status
+ */
+const processJsonContent = <S extends number, D>(
+  status: S,
+  contentType: string | undefined,
+  text: string,
+  decoder: (
+    s: number,
+    ct: string,
+    body: string,
+    parsed: Json
+  ) => Effect.Effect<D, DecodeError>
+) =>
+  contentType?.includes("application/json")
+    ? Effect.gen(function*() {
+      const parsed = yield* parseJSON(status, "application/json", text)
+      const decoded = yield* decoder(status, "application/json", text, parsed)
+      return {
+        status,
+        contentType: "application/json" as const,
+        body: decoded
+      } as const
+    })
+    : Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
+
+type Json = null | boolean | number | string | ReadonlyArray<Json> | { readonly [k: string]: Json }
 
 /**
  * Dispatcher for listPets
@@ -20,38 +54,13 @@ import * as Decoders from "./decoders.js"
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatcherlistPets = createDispatcher((status, contentType, text) => {
-    switch (status) {
-        case 200:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodelistPets_200(status, "application/json", text, parsed)
-                    return {
-                        status: 200,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        case 500:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodelistPets_500(status, "application/json", text, parsed)
-                    return {
-                        status: 500,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        default:
-            return Effect.fail(unexpectedStatus(status, text))
-    }
-})
+export const dispatcherlistPets = createDispatcher((status, contentType, text) =>
+  Match.value(status).pipe(
+    Match.when(200, () => processJsonContent(200, contentType, text, Decoders.decodelistPets_200)),
+    Match.when(500, () => processJsonContent(500, contentType, text, Decoders.decodelistPets_500)),
+    Match.orElse(() => Effect.fail(unexpectedStatus(status, text)))
+  )
+)
 
 /**
  * Dispatcher for createPet
@@ -60,51 +69,14 @@ export const dispatcherlistPets = createDispatcher((status, contentType, text) =
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatchercreatePet = createDispatcher((status, contentType, text) => {
-    switch (status) {
-        case 201:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodecreatePet_201(status, "application/json", text, parsed)
-                    return {
-                        status: 201,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        case 400:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodecreatePet_400(status, "application/json", text, parsed)
-                    return {
-                        status: 400,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        case 500:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodecreatePet_500(status, "application/json", text, parsed)
-                    return {
-                        status: 500,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        default:
-            return Effect.fail(unexpectedStatus(status, text))
-    }
-})
+export const dispatchercreatePet = createDispatcher((status, contentType, text) =>
+  Match.value(status).pipe(
+    Match.when(201, () => processJsonContent(201, contentType, text, Decoders.decodecreatePet_201)),
+    Match.when(400, () => processJsonContent(400, contentType, text, Decoders.decodecreatePet_400)),
+    Match.when(500, () => processJsonContent(500, contentType, text, Decoders.decodecreatePet_500)),
+    Match.orElse(() => Effect.fail(unexpectedStatus(status, text)))
+  )
+)
 
 /**
  * Dispatcher for getPet
@@ -113,51 +85,14 @@ export const dispatchercreatePet = createDispatcher((status, contentType, text) 
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatchergetPet = createDispatcher((status, contentType, text) => {
-    switch (status) {
-        case 200:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodegetPet_200(status, "application/json", text, parsed)
-                    return {
-                        status: 200,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        case 404:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodegetPet_404(status, "application/json", text, parsed)
-                    return {
-                        status: 404,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        case 500:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodegetPet_500(status, "application/json", text, parsed)
-                    return {
-                        status: 500,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        default:
-            return Effect.fail(unexpectedStatus(status, text))
-    }
-})
+export const dispatchergetPet = createDispatcher((status, contentType, text) =>
+  Match.value(status).pipe(
+    Match.when(200, () => processJsonContent(200, contentType, text, Decoders.decodegetPet_200)),
+    Match.when(404, () => processJsonContent(404, contentType, text, Decoders.decodegetPet_404)),
+    Match.when(500, () => processJsonContent(500, contentType, text, Decoders.decodegetPet_500)),
+    Match.orElse(() => Effect.fail(unexpectedStatus(status, text)))
+  )
+)
 
 /**
  * Dispatcher for deletePet
@@ -166,41 +101,18 @@ export const dispatchergetPet = createDispatcher((status, contentType, text) => 
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatcherdeletePet = createDispatcher((status, contentType, text) => {
-    switch (status) {
-        case 204:
-            return Effect.succeed({
-                status: 204,
-                contentType: "none" as const,
-                body: undefined as void
-            } as const)
-        case 404:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodedeletePet_404(status, "application/json", text, parsed)
-                    return {
-                        status: 404,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        case 500:
-            if (contentType?.includes("application/json")) {
-                return Effect.gen(function*() {
-                    const parsed = yield* parseJSON(status, "application/json", text)
-                    const decoded = yield* Decoders.decodedeletePet_500(status, "application/json", text, parsed)
-                    return {
-                        status: 500,
-                        contentType: "application/json" as const,
-                        body: decoded
-                    } as const
-                })
-            }
-            return Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-        default:
-            return Effect.fail(unexpectedStatus(status, text))
-    }
-})
+export const dispatcherdeletePet = createDispatcher((status, contentType, text) =>
+  Match.value(status).pipe(
+    Match.when(204, () =>
+      Effect.succeed(
+        {
+          status: 204,
+          contentType: "none" as const,
+          body: undefined
+        } as const
+      )),
+    Match.when(404, () => processJsonContent(404, contentType, text, Decoders.decodedeletePet_404)),
+    Match.when(500, () => processJsonContent(500, contentType, text, Decoders.decodedeletePet_500)),
+    Match.orElse(() => Effect.fail(unexpectedStatus(status, text)))
+  )
+)

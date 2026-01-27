@@ -4,5 +4,5 @@
 // PURITY: CORE
 // COMPLEXITY: O(1)
 
-export * from "./dispatch.js"
 export * from "./decoders.js"
+export * from "./dispatch.js"

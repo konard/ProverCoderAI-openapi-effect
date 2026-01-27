@@ -4,7 +4,7 @@
 		"rootDir": ".",
 		"outDir": "dist",
 		"types": ["vitest"],
-		"lib": ["ES2022", "DOM"],
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"baseUrl": ".",
 		"paths": {
 			"@/*": ["src/*"]
