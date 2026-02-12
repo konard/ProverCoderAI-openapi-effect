@@ -341,12 +341,14 @@ export default defineConfig(
     },
   },
 
-  // 5) Generated OpenAPI types: interface names follow openapi-typescript convention (lowercase)
+  // 5) Generated OpenAPI schema uses canonical lowercase names from openapi-typescript
   {
-    files: ['src/core/api/openapi.d.ts'],
+    files: ["src/core/api/openapi.d.ts"],
     rules: {
-      'sonarjs/class-name': 'off',
-      'max-lines': 'off',
+      "sonarjs/class-name": "off",
+      "max-lines": "off",
+      "max-lines-per-function": "off",
+      "complexity": "off",
     },
   },
 
