@@ -26,22 +26,22 @@ const isHeaderRecord = (headers: HeadersOptions): headers is HeaderRecord => (
   !(headers instanceof Headers) && !Array.isArray(headers)
 )
 
-const getHeaderValue = (headers: Headers | HeadersOptions | undefined, key: string): string | undefined => {
+const getHeaderValue = (headers: Headers | HeadersOptions | undefined, key: string): string => {
   if (headers === undefined) {
-    return
+    return ""
   }
 
   if (headers instanceof Headers) {
-    return headers.get(key) ?? undefined
+    return headers.get(key) ?? ""
   }
 
   if (!isHeaderRecord(headers)) {
-    return
+    return ""
   }
 
   const value = headers[key]
   if (value === undefined || value === null || Array.isArray(value)) {
-    return
+    return ""
   }
 
   return String(value)
@@ -59,7 +59,7 @@ export const defaultBodySerializer = (
     return ""
   }
 
-  const contentType = getHeaderValue(headers, "Content-Type") ?? getHeaderValue(headers, "content-type")
+  const contentType = getHeaderValue(headers, "Content-Type") || getHeaderValue(headers, "content-type")
   if (contentType === "application/x-www-form-urlencoded") {
     return new URLSearchParams(toFormRecord(body)).toString()
   }
@@ -91,7 +91,7 @@ export const createFinalURL = (
   }
 
   if (queryString.length > 0) {
-    finalURL = `${finalURL}?${queryString}`
+    finalURL += `?${queryString}`
   }
 
   return finalURL

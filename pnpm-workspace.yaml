@@ -1,2 +1,13 @@
 packages:
   - packages/*
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - effect@3.21.4
+  - eslint-plugin-sonarjs@4.1.0
+  - eslint-plugin-unicorn@68.0.0
+allowBuilds:
+  '@parcel/watcher': true
+  msgpackr-extract: true
+  unrs-resolver: true
+  esbuild: false
+  node-pty: false

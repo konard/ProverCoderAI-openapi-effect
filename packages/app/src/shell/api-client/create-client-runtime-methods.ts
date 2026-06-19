@@ -19,8 +19,20 @@ export type CoreFetch<Success, Failure> = (
 ) => Effect.Effect<Success, Failure>
 
 const hasMiddlewareHook = (value: Middleware): boolean => (
-  "onRequest" in value || "onResponse" in value || "onError" in value
+  typeof value.onRequest === "function"
+  || typeof value.onResponse === "function"
+  || typeof value.onError === "function"
 )
+
+const findMiddlewareIndex = (middleware: ReadonlyArray<Middleware>, item: Middleware): number => {
+  for (const [middlewareIndex, registered] of middleware.entries()) {
+    if (registered === item) {
+      return middlewareIndex
+    }
+  }
+
+  return -1
+}
 
 export const createClientMethods = <Success, Failure>(
   coreFetch: CoreFetch<Success, Failure>,
@@ -45,7 +57,7 @@ export const createClientMethods = <Success, Failure>(
   },
   eject: (...middleware) => {
     for (const item of middleware) {
-      const index = globalMiddlewares.indexOf(item)
+      const index = findMiddlewareIndex(globalMiddlewares, item)
       if (index !== -1) {
         globalMiddlewares.splice(index, 1)
       }

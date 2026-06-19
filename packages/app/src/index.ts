@@ -32,6 +32,9 @@ export {
   mergeHeaders,
   removeTrailingSlash,
   serializeArrayParam,
+  serializeArrayParameter,
   serializeObjectParam,
-  serializePrimitiveParam
+  serializeObjectParameter,
+  serializePrimitiveParam,
+  serializePrimitiveParameter
 } from "./shell/api-client/index.js"

@@ -154,29 +154,29 @@ describe("Auth schema: ApiFailure union", () => {
 describe("Auth schema: RequestOptionsFor body constraints", () => {
   it("login requires body with email and password", () => {
     type LoginOp = operations["auth.postLogin"]
-    type Opts = RequestOptionsFor<LoginOp>
+    type Options = RequestOptionsFor<LoginOp>
     // body should be required (not optional)
-    expectTypeOf<Opts>().toHaveProperty("body")
+    expectTypeOf<Options>().toHaveProperty("body")
   })
 
   it("register requires body with token and password", () => {
     type RegisterOp = operations["registration.postRegister"]
-    type Opts = RequestOptionsFor<RegisterOp>
-    expectTypeOf<Opts>().toHaveProperty("body")
+    type Options = RequestOptionsFor<RegisterOp>
+    expectTypeOf<Options>().toHaveProperty("body")
   })
 
   it("logout does NOT require body", () => {
     type LogoutOp = operations["auth.postLogout"]
-    type Opts = RequestOptionsFor<LogoutOp>
+    type Options = RequestOptionsFor<LogoutOp>
     // body should be optional
-    type HasOptionalBody = undefined extends Opts["body"] ? true : false
+    type HasOptionalBody = undefined extends Options["body"] ? true : false
     expectTypeOf<HasOptionalBody>().toEqualTypeOf<true>()
   })
 
   it("getMe does NOT require body", () => {
     type MeOp = operations["auth.getMe"]
-    type Opts = RequestOptionsFor<MeOp>
-    type HasOptionalBody = undefined extends Opts["body"] ? true : false
+    type Options = RequestOptionsFor<MeOp>
+    type HasOptionalBody = undefined extends Options["body"] ? true : false
     expectTypeOf<HasOptionalBody>().toEqualTypeOf<true>()
   })
 })

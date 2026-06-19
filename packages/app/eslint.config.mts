@@ -100,6 +100,23 @@ export default defineConfig(
 		"unicorn/prefer-top-level-await": "off",
 		"unicorn/prevent-abbreviations": "off",
 		"unicorn/no-null": "off",
+		"unicorn/name-replacements": ["error", {
+			allowList: {
+				DefaultParamsOption: true,
+				HasRequiredPathParams: true,
+				InitParam: true,
+				MethodArgs: true,
+				MiddlewareCallbackParams: true,
+				MiddlewareRequestParams: true,
+				ParamsOption: true,
+				PathParamsFor: true,
+				QueryParamsFor: true,
+				RequestMethodArgs: true,
+				serializeArrayParam: true,
+				serializeObjectParam: true,
+				serializePrimitiveParam: true,
+			},
+		}],
 		complexity: ["error", 8],
 		"max-lines-per-function": [
 			"error",

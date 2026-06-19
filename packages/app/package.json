@@ -20,9 +20,9 @@
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
     "dev": "vite build --watch",
-    "lint": "npx @ton-ai-core/vibecode-linter src/",
-    "lint:tests": "npx @ton-ai-core/vibecode-linter tests/",
-    "lint:effect": "npx eslint --config eslint.effect-ts-check.config.mjs .",
+    "lint": "vibecode-linter src/",
+    "lint:tests": "vibecode-linter tests/",
+    "lint:effect": "eslint --config eslint.effect-ts-check.config.mjs .",
     "lint:types": "./scripts/lint-types.sh",
     "check": "tsc --noEmit",
     "test": "vitest run",

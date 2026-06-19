@@ -33,16 +33,5 @@
     "url": "https://github.com/ProverCoderAI/effect-template/issues"
   },
   "homepage": "https://github.com/ProverCoderAI/effect-template#readme",
-  "license": "ISC",
-  "pnpm": {
-    "ignoredBuiltDependencies": [
-      "esbuild",
-      "node-pty"
-    ],
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "msgpackr-extract",
-      "unrs-resolver"
-    ]
-  }
+  "license": "ISC"
 }

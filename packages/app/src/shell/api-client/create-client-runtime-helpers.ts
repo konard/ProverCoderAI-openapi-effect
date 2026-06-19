@@ -2,27 +2,27 @@ import { Effect } from "effect"
 
 import { asStrictApiClient } from "../../core/axioms.js"
 import { toError } from "./create-client-response.js"
-import type { FetchWithRequestInitExt, HeaderRecord } from "./create-client-runtime-types.js"
+import type { FetchWithRequestInitExtension, HeaderRecord } from "./create-client-runtime-types.js"
 import type {
   BodySerializer,
   ClientOptions,
   MergedOptions,
-  MiddlewareRequestParams,
+  MiddlewareRequestParameters,
   ParseAs,
   PathSerializer,
   QuerySerializer,
   QuerySerializerOptions
 } from "./create-client-types.js"
-import { createQuerySerializer } from "./openapi-compat-utils.js"
+import { createQuerySerializer } from "./openapi-compat-utilities.js"
 
-export const supportsRequestInitExt = (): boolean => (
+export const hasRequestInitExtensionSupport = (): boolean => (
   typeof process === "object"
-  && Number.parseInt(process.versions.node.slice(0, 2), 10) >= 18
+  && Number(process.versions.node.slice(0, 2)) >= 18
   && typeof process.versions["undici"] === "string"
 )
 
 export const randomID = (): string => (
-  globalThis.crypto.randomUUID().replaceAll("-", "").slice(0, 9)
+  crypto.randomUUID().replaceAll("-", "").slice(0, 9)
 )
 
 const isQuerySerializerOptions = (
@@ -43,7 +43,7 @@ export const resolveQuerySerializer = (
     serializer = typeof requestQuerySerializer === "function"
       ? requestQuerySerializer
       : createQuerySerializer({
-        ...(isQuerySerializerOptions(globalQuerySerializer) ? globalQuerySerializer : {}),
+        ...(isQuerySerializerOptions(globalQuerySerializer) && globalQuerySerializer),
         ...requestQuerySerializer
       })
   }
@@ -55,7 +55,7 @@ const isHeaderPrimitive = (value: unknown): value is string | number | boolean =
   typeof value === "string" || typeof value === "number" || typeof value === "boolean"
 )
 
-export const toHeaderOverrides = (headers: MiddlewareRequestParams["header"]): HeaderRecord => {
+export const toHeaderOverrides = (headers: MiddlewareRequestParameters["header"]): HeaderRecord => {
   if (headers === undefined) {
     return {}
   }
@@ -84,9 +84,10 @@ const isBodyInit = (value: BodyInit | object): value is BodyInit => (
   || value instanceof ReadableStream
 )
 
-export type SerializedBody =
-  | { hasBody: false }
-  | { hasBody: true; value: BodyInit }
+export type SerializedBody = Readonly<{
+  hasBody: boolean
+  value: BodyInit | undefined
+}>
 
 export const serializeBody = (
   body: BodyInit | object | undefined,
@@ -94,7 +95,7 @@ export const serializeBody = (
   headers: Headers
 ): SerializedBody => {
   if (body === undefined) {
-    return { hasBody: false }
+    return { hasBody: false, value: undefined }
   }
 
   if (isBodyInit(body)) {
@@ -106,7 +107,7 @@ export const serializeBody = (
 
 export const setCustomRequestFields = (request: Request, init: Record<string, unknown>): void => {
   for (const key in init) {
-    if (!(key in request)) {
+    if (!Reflect.has(request, key)) {
       Reflect.set(request, key, init[key])
     }
   }
@@ -115,11 +116,11 @@ export const setCustomRequestFields = (request: Request, init: Record<string, un
 export const invokeFetch = (
   fetch: NonNullable<ClientOptions["fetch"]>,
   request: Request,
-  requestInitExt?: Record<string, unknown>
+  requestInitExtension?: Record<string, unknown>
 ): Effect.Effect<Response, Error> => {
-  const fetchWithExt = asStrictApiClient<FetchWithRequestInitExt>(fetch)
+  const fetchWithExtension = asStrictApiClient<FetchWithRequestInitExtension>(fetch)
   return Effect.tryPromise({
-    try: () => fetchWithExt(request, requestInitExt),
+    try: () => fetchWithExtension(request, requestInitExtension),
     catch: toError
   })
 }

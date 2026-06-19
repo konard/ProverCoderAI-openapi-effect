@@ -4,12 +4,12 @@ import { applyErrorMiddleware, applyRequestMiddleware, applyResponseMiddleware }
 import { createStrictResponseEffect, toTransportError } from "./create-client-response.js"
 import {
   createMergedOptions,
+  hasRequestInitExtensionSupport,
   invokeFetch,
   randomID,
   resolveQuerySerializer,
   serializeBody,
   setCustomRequestFields,
-  supportsRequestInitExt,
   toHeaderOverrides
 } from "./create-client-runtime-helpers.js"
 import type { SerializedBody } from "./create-client-runtime-helpers.js"
@@ -24,7 +24,7 @@ import type {
   BodySerializer,
   ClientOptions,
   Middleware,
-  MiddlewareRequestParams,
+  MiddlewareRequestParameters,
   ParseAs,
   PathSerializer,
   QuerySerializer
@@ -35,13 +35,13 @@ import {
   defaultPathSerializer,
   mergeHeaders,
   removeTrailingSlash
-} from "./openapi-compat-utils.js"
+} from "./openapi-compat-utilities.js"
 
 type ResolvedFetchConfig = {
   Request: typeof Request
   fetch: NonNullable<ClientOptions["fetch"]>
   parseAs: ParseAs
-  params: MiddlewareRequestParams
+  params: MiddlewareRequestParameters
   body: BodyInit | object | undefined
   bodySerializer: BodySerializer<unknown>
   headers: ClientOptions["headers"]
@@ -87,7 +87,7 @@ const resolveFetchConfig = (
     fetch = config.fetch,
     headers,
     middleware: requestMiddlewares = [],
-    params = {},
+    params: parameters = {},
     parseAs = "json",
     pathSerializer: requestPathSerializer,
     querySerializer: requestQuerySerializer,
@@ -98,7 +98,7 @@ const resolveFetchConfig = (
     Request,
     fetch,
     parseAs,
-    params,
+    params: parameters,
     body,
     bodySerializer: resolveBodySerializer(config.bodySerializer, requestBodySerializer),
     headers,
@@ -148,9 +148,8 @@ const createRequest = (
     redirect: "follow",
     ...config.baseOptions,
     ...resolved.init,
-    ...(resolvedHeaders.serializedBody.hasBody
-      ? { body: resolvedHeaders.serializedBody.value }
-      : {}),
+    ...(resolvedHeaders.serializedBody.hasBody && resolvedHeaders.serializedBody.value !== undefined &&
+      { body: resolvedHeaders.serializedBody.value }),
     headers: resolvedHeaders.finalHeaders
   }
 
@@ -257,7 +256,7 @@ const createBaseRuntimeConfig = (
     headers,
     pathSerializer,
     querySerializer,
-    requestInitExt: rawRequestInitExt,
+    requestInitExt: rawRequestInitExtension,
     ...baseOptions
   } = { ...clientOptions }
 
@@ -269,7 +268,7 @@ const createBaseRuntimeConfig = (
     headers,
     pathSerializer,
     querySerializer,
-    requestInitExt: supportsRequestInitExt() ? rawRequestInitExt : undefined,
+    requestInitExt: hasRequestInitExtensionSupport() ? rawRequestInitExtension : undefined,
     baseOptions,
     globalMiddlewares
   }

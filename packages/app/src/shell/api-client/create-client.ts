@@ -8,6 +8,7 @@ export type {
   FetchOptions,
   HeadersOptions,
   Middleware,
+  MiddlewareCallbackParameters,
   MiddlewareCallbackParams,
   ParseAs,
   QuerySerializer,
@@ -31,9 +32,12 @@ export {
   mergeHeaders,
   removeTrailingSlash,
   serializeArrayParam,
+  serializeArrayParameter,
   serializeObjectParam,
-  serializePrimitiveParam
-} from "./openapi-compat-utils.js"
+  serializeObjectParameter,
+  serializePrimitiveParam,
+  serializePrimitiveParameter
+} from "./openapi-compat-utilities.js"
 
 export const createClientEffect = <Paths extends object>(
   clientOptions?: ClientOptions

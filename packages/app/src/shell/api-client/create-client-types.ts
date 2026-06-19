@@ -51,7 +51,7 @@ export type BodySerializer<T> = (
 
 export type PathSerializer = (
   pathname: string,
-  pathParams: Record<string, unknown>
+  pathParameters: Record<string, unknown>
 ) => string
 
 type BodyType<T = unknown> = {
@@ -64,16 +64,20 @@ type BodyType<T = unknown> = {
 
 export type ParseAs = keyof BodyType
 
-export interface DefaultParamsOption {
+export interface DefaultParametersOption {
   params?: {
     query?: Record<string, unknown>
   }
 }
 
-export type ParamsOption<T> = T extends { parameters: infer Parameters }
+export type DefaultParamsOption = DefaultParametersOption
+
+export type ParametersOption<T> = T extends { parameters: infer Parameters }
   ? RequiredKeysOf<Parameters> extends never ? { params?: Parameters }
   : { params: Parameters }
-  : DefaultParamsOption
+  : DefaultParametersOption
+
+export type ParamsOption<T> = ParametersOption<T>
 
 export type RequestBodyOption<T> = Writable<OperationRequestBodyContent<T>> extends never ? { body?: never }
   : IsOperationRequestBodyOptional<T> extends true ? { body?: Writable<OperationRequestBodyContent<T>> }
@@ -82,7 +86,7 @@ export type RequestBodyOption<T> = Writable<OperationRequestBodyContent<T>> exte
 export type FetchOptions<T> = RequestOptions<T> & Omit<RequestInit, "body" | "headers">
 
 export type RequestOptions<T> =
-  & ParamsOption<T>
+  & ParametersOption<T>
   & RequestBodyOption<T>
   & {
     baseUrl?: string
@@ -104,41 +108,45 @@ export type MergedOptions<T = unknown> = {
   fetch: typeof globalThis.fetch
 }
 
-export interface MiddlewareRequestParams {
+export interface MiddlewareRequestParameters {
   query?: Record<string, unknown>
   header?: Record<string, unknown>
   path?: Record<string, unknown>
   cookie?: Record<string, unknown>
 }
 
-export interface MiddlewareCallbackParams {
+export type MiddlewareRequestParams = MiddlewareRequestParameters
+
+export interface MiddlewareCallbackParameters {
   request: Request
   readonly schemaPath: string
-  readonly params: MiddlewareRequestParams
+  readonly params: MiddlewareRequestParameters
   readonly id: string
   readonly options: MergedOptions
 }
 
+export type MiddlewareCallbackParams = MiddlewareCallbackParameters
+
 export type Thenable<T> = {
-  then: (
-    onFulfilled: (value: T) => unknown,
-    onRejected?: (reason: unknown) => unknown
-  ) => unknown
+  readonly then: <Success = T, Failure = never>(
+    onFulfilled?: ((value: T) => Success | Thenable<Success>) | null,
+    onRejected?: ((reason: unknown) => Failure | Thenable<Failure>) | null
+  ) => Thenable<Success | Failure>
 }
 
 export type AsyncValue<T> = T | undefined | Thenable<T | undefined>
 
 export type MiddlewareOnRequest =
-  | ((options: MiddlewareCallbackParams) => AsyncValue<Request | Response>)
-  | ((options: MiddlewareCallbackParams) => void)
+  | ((options: MiddlewareCallbackParameters) => AsyncValue<Request | Response>)
+  | ((options: MiddlewareCallbackParameters) => void)
 
 export type MiddlewareOnResponse =
-  | ((options: MiddlewareCallbackParams & { response: Response }) => AsyncValue<Response>)
-  | ((options: MiddlewareCallbackParams & { response: Response }) => void)
+  | ((options: MiddlewareCallbackParameters & { response: Response }) => AsyncValue<Response>)
+  | ((options: MiddlewareCallbackParameters & { response: Response }) => void)
 
 export type MiddlewareOnError =
-  | ((options: MiddlewareCallbackParams & { error: unknown }) => AsyncValue<Response | Error>)
-  | ((options: MiddlewareCallbackParams & { error: unknown }) => void)
+  | ((options: MiddlewareCallbackParameters & { error: unknown }) => AsyncValue<Response | Error>)
+  | ((options: MiddlewareCallbackParameters & { error: unknown }) => void)
 
 export type Middleware =
   | {
@@ -157,13 +165,15 @@ export type Middleware =
     onError: MiddlewareOnError
   }
 
-export type MaybeOptionalInit<Params, Location extends keyof Params> = RequiredKeysOf<
-  FetchOptions<FilterKeys<Params, Location>>
-> extends never ? FetchOptions<FilterKeys<Params, Location>> | undefined
-  : FetchOptions<FilterKeys<Params, Location>>
+export type MaybeOptionalInit<Parameters_, Location extends keyof Parameters_> = RequiredKeysOf<
+  FetchOptions<FilterKeys<Parameters_, Location>>
+> extends never ? FetchOptions<FilterKeys<Parameters_, Location>> | undefined
+  : FetchOptions<FilterKeys<Parameters_, Location>>
 
-export type InitParam<Init> = RequiredKeysOf<Init> extends never ? [(Init & { [key: string]: unknown })?]
+export type InitParameter<Init> = RequiredKeysOf<Init> extends never ? [(Init & { [key: string]: unknown })?]
   : [Init & { [key: string]: unknown }]
+
+export type InitParam<Init> = InitParameter<Init>
 
 export type OperationFor<
   Paths extends object,
@@ -172,14 +182,24 @@ export type OperationFor<
 > = Paths[Path] extends Record<Method, infer Operation> ? Operation & Record<string | number, unknown>
   : never
 
+export type MethodArguments<
+  Paths extends object,
+  Method extends HttpMethod,
+  Path extends PathsWithMethod<Paths, Method>,
+  Init extends MaybeOptionalInit<Paths[Path], Extract<Method, keyof Paths[Path]>>
+> = [url: Path, ...init: InitParameter<Init>]
+
 export type MethodArgs<
   Paths extends object,
   Method extends HttpMethod,
   Path extends PathsWithMethod<Paths, Method>,
   Init extends MaybeOptionalInit<Paths[Path], Extract<Method, keyof Paths[Path]>>
-> = [url: Path, ...init: InitParam<Init>]
+> = MethodArguments<Paths, Method, Path, Init>
 
-export type RequestMethodArgs<Method extends HttpMethod, Args extends ReadonlyArray<unknown>> = [
+export type RequestMethodArguments<Method extends HttpMethod, Arguments extends ReadonlyArray<unknown>> = [
   method: Method,
-  ...args: Args
+  ...args: Arguments
 ]
+
+export type RequestMethodArgs<Method extends HttpMethod, Arguments extends ReadonlyArray<unknown>> =
+  RequestMethodArguments<Method, Arguments>

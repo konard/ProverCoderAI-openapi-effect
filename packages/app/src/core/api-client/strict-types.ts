@@ -50,10 +50,12 @@ export type ResponsesFor<Op> = Op extends { responses: infer R } ? R : never
  * @pure true - compile-time only
  * @invariant Returns path params type or undefined if none
  */
-export type PathParamsFor<Op> = Op extends { parameters: { path: infer P } }
+export type PathParametersFor<Op> = Op extends { parameters: { path: infer P } }
   ? P extends Record<string, infer V> ? Record<string, V>
   : never
   : undefined
+
+export type PathParamsFor<Op> = PathParametersFor<Op>
 
 /**
  * Extract query parameters from operation
@@ -61,8 +63,10 @@ export type PathParamsFor<Op> = Op extends { parameters: { path: infer P } }
  * @pure true - compile-time only
  * @invariant Returns query params type or undefined if none
  */
-export type QueryParamsFor<Op> = Op extends { parameters: { query?: infer Q } } ? Q
+export type QueryParametersFor<Op> = Op extends { parameters: { query?: infer Q } } ? Q
   : undefined
+
+export type QueryParamsFor<Op> = QueryParametersFor<Op>
 
 /**
  * Extract request body type from operation
@@ -82,10 +86,12 @@ export type RequestBodyFor<Op> = Op extends { requestBody: { content: infer C } 
  * @pure true - compile-time only
  */
 
-export type HasRequiredPathParams<Op> = Op extends { parameters: { path: infer P } }
+export type HasRequiredPathParameters<Op> = Op extends { parameters: { path: infer P } }
   ? P extends Record<PropertyKey, string | number | boolean> ? keyof P extends never ? false : true
   : false
   : false
+
+export type HasRequiredPathParams<Op> = HasRequiredPathParameters<Op>
 
 /**
  * Check if request body is required
@@ -110,11 +116,11 @@ export type HasRequiredBody<Op> = Op extends { requestBody: infer RB } ? RB exte
  * @invariant Options type is fully derived from operation definition
  */
 export type RequestOptionsFor<Op> =
-  & (HasRequiredPathParams<Op> extends true ? { readonly params: PathParamsFor<Op> }
-    : { readonly params?: PathParamsFor<Op> })
+  & (HasRequiredPathParameters<Op> extends true ? { readonly params: PathParametersFor<Op> }
+    : { readonly params?: PathParametersFor<Op> })
   & (HasRequiredBody<Op> extends true ? { readonly body: RequestBodyFor<Op> | BodyInit }
     : { readonly body?: RequestBodyFor<Op> | BodyInit })
-  & { readonly query?: QueryParamsFor<Op> }
+  & { readonly query?: QueryParametersFor<Op> }
   & { readonly headers?: HeadersInit }
   & { readonly signal?: AbortSignal }
 

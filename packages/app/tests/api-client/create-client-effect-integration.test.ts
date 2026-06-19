@@ -21,13 +21,13 @@ const createMockFetch = (
   body: string
 ) =>
 (_request: Request) =>
-  Effect.runPromise(
-    Effect.succeed(
-      status === 204 || status === 304
-        ? new Response(null, { status, headers: new Headers(headers) })
-        : new Response(body, { status, headers: new Headers(headers) })
-    )
-  )
+  Effect.runPromise(Effect.sync(() => {
+    const responseHeaders = new Headers(headers)
+    const responseInit: ResponseInit = { status, headers: responseHeaders }
+    const responseBody = status === 204 || status === 304 ? null : body
+
+    return new Response(responseBody, responseInit)
+  }))
 
 describe("createClientEffect integration", () => {
   it("returns ApiSuccess for 200 login", () =>

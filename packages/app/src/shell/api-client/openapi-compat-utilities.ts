@@ -1,8 +1,11 @@
 export {
   createQuerySerializer,
-  serializeArrayParam,
-  serializeObjectParam,
-  serializePrimitiveParam
+  serializeArrayParameter,
+  serializeArrayParameter as serializeArrayParam,
+  serializeObjectParameter,
+  serializeObjectParameter as serializeObjectParam,
+  serializePrimitiveParameter,
+  serializePrimitiveParameter as serializePrimitiveParam
 } from "./openapi-compat-serializers.js"
 
 export { defaultPathSerializer } from "./openapi-compat-path.js"

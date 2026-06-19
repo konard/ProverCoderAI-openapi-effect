@@ -41,7 +41,7 @@ const isEmptyResponse = (
 )
 
 const normalizeContentType = (value: string | null): string | undefined => (
-  value?.split(";")[0]?.trim().toLowerCase()
+  value?.split(";", 1)[0]?.trim().toLowerCase()
 )
 
 const resolveContentType = (response: Response, fallback: string): string => (

@@ -1,4 +1,8 @@
-import { serializeArrayParam, serializeObjectParam, serializePrimitiveParam } from "./openapi-compat-serializers.js"
+import {
+  serializeArrayParameter,
+  serializeObjectParameter,
+  serializePrimitiveParameter
+} from "./openapi-compat-serializers.js"
 import { isPrimitive, isRecord } from "./openapi-compat-value-guards.js"
 
 const PATH_PARAM_RE = /\{[^{}]+\}/g
@@ -13,11 +17,11 @@ type PathTokenMeta = {
 
 const toPathTokenMeta = (rawName: string): PathTokenMeta => {
   let name = rawName
-  let explode = false
+  let isExplode = false
   let style: PathStyle = "simple"
 
   if (name.endsWith("*")) {
-    explode = true
+    isExplode = true
     name = name.slice(0, Math.max(0, name.length - 1))
   }
 
@@ -29,7 +33,7 @@ const toPathTokenMeta = (rawName: string): PathTokenMeta => {
     name = name.slice(1)
   }
 
-  return { name, explode, style }
+  return { name, explode: isExplode, style }
 }
 
 const serializePathValue = (
@@ -38,11 +42,11 @@ const serializePathValue = (
   meta: PathTokenMeta
 ): string | undefined => {
   if (Array.isArray(value)) {
-    return serializeArrayParam(name, value, { style: meta.style, explode: meta.explode })
+    return serializeArrayParameter(name, value, { style: meta.style, explode: meta.explode })
   }
 
   if (isRecord(value)) {
-    return serializeObjectParam(name, value, { style: meta.style, explode: meta.explode })
+    return serializeObjectParameter(name, value, { style: meta.style, explode: meta.explode })
   }
 
   if (!isPrimitive(value)) {
@@ -50,7 +54,7 @@ const serializePathValue = (
   }
 
   if (meta.style === "matrix") {
-    return `;${serializePrimitiveParam(name, value)}`
+    return `;${serializePrimitiveParameter(name, value)}`
   }
 
   const encoded = encodeURIComponent(String(value))
@@ -59,14 +63,15 @@ const serializePathValue = (
 
 export const defaultPathSerializer = (
   pathname: string,
-  pathParams: Record<string, unknown>
+  pathParameters: Record<string, unknown>
 ): string => {
   let nextURL = pathname
+  const pathParameterMatches = pathname.match(PATH_PARAM_RE) ?? []
 
-  for (const match of pathname.match(PATH_PARAM_RE) ?? []) {
+  for (const match of pathParameterMatches) {
     const rawName = match.slice(1, -1)
     const meta = toPathTokenMeta(rawName)
-    const value = pathParams[meta.name]
+    const value = pathParameters[meta.name]
 
     if (value === undefined || value === null) {
       continue
@@ -74,7 +79,7 @@ export const defaultPathSerializer = (
 
     const serializedValue = serializePathValue(meta.name, value, meta)
     if (serializedValue !== undefined) {
-      nextURL = nextURL.replace(match, serializedValue)
+      nextURL = nextURL.replace(match, () => serializedValue)
     }
   }
 

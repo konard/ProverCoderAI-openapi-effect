@@ -7,7 +7,7 @@ import type {
   ClientOptions,
   HeadersOptions,
   Middleware,
-  MiddlewareRequestParams,
+  MiddlewareRequestParameters,
   ParseAs,
   PathSerializer,
   QuerySerializer,
@@ -31,7 +31,7 @@ export type RuntimeFetchOptions = Omit<RequestInit, "body" | "headers" | "method
   fetch?: NonNullable<ClientOptions["fetch"]>
   Request?: ClientOptions["Request"]
   headers?: HeadersOptions
-  params?: MiddlewareRequestParams
+  params?: MiddlewareRequestParameters
   parseAs?: ParseAs
   querySerializer?: QuerySerializer<unknown> | QuerySerializerOptions
   pathSerializer?: PathSerializer
@@ -100,7 +100,7 @@ export type PreparedRequest = {
   requestInitExt: Record<string, unknown> | undefined
 }
 
-export type FetchWithRequestInitExt = (
+export type FetchWithRequestInitExtension = (
   input: Request,
-  requestInitExt?: Record<string, unknown>
+  requestInitExtension?: Record<string, unknown>
 ) => ReturnType<typeof globalThis.fetch>

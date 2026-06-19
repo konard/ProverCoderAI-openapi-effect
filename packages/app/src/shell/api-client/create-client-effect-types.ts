@@ -14,10 +14,10 @@ import type { HttpMethod, PathsWithMethod } from "openapi-typescript-helpers"
 import type { ApiFailure, ApiSuccess, ResponsesFor } from "../../core/api-client/strict-types.js"
 import type {
   MaybeOptionalInit,
-  MethodArgs,
+  MethodArguments,
   Middleware,
   OperationFor,
-  RequestMethodArgs
+  RequestMethodArguments
 } from "./create-client-types.js"
 
 type EffectMethodResult<
@@ -45,7 +45,7 @@ export interface EffectClientMethod<
     Path extends EffectPath<Paths, Method>,
     Init extends EffectInit<Paths, Method, Path>
   >(
-    ...args: MethodArgs<Paths, Method, Path, Init>
+    ...arguments_: MethodArguments<Paths, Method, Path, Init>
   ): EffectMethodResult<Paths, Path, Method>
 }
 
@@ -55,7 +55,7 @@ export interface EffectClientRequestMethod<Paths extends object> {
     Path extends EffectPath<Paths, Method>,
     Init extends EffectInit<Paths, Method, Path>
   >(
-    ...args: RequestMethodArgs<Method, MethodArgs<Paths, Method, Path, Init>>
+    ...arguments_: RequestMethodArguments<Method, MethodArguments<Paths, Method, Path, Init>>
   ): EffectMethodResult<Paths, Path, Method>
 }
 

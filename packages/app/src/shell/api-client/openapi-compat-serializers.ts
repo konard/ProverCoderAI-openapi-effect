@@ -2,10 +2,10 @@ import type { QuerySerializer, QuerySerializerOptions } from "./create-client-ty
 import { isPrimitive, isRecord, type Primitive } from "./openapi-compat-value-guards.js"
 
 type PathStyle = "simple" | "label" | "matrix"
-type ObjectParamStyle = PathStyle | "form" | "deepObject"
-type ArrayParamStyle = PathStyle | "form" | "spaceDelimited" | "pipeDelimited"
+type ObjectParameterStyle = PathStyle | "form" | "deepObject"
+type ArrayParameterStyle = PathStyle | "form" | "spaceDelimited" | "pipeDelimited"
 
-const OBJECT_JOINER_BY_STYLE: Readonly<Record<ObjectParamStyle, string>> = {
+const OBJECT_JOINER_BY_STYLE: Readonly<Record<ObjectParameterStyle, string>> = {
   simple: ",",
   label: ".",
   matrix: ";",
@@ -14,7 +14,7 @@ const OBJECT_JOINER_BY_STYLE: Readonly<Record<ObjectParamStyle, string>> = {
 }
 
 const ARRAY_JOINER_BY_STYLE: Readonly<
-  Record<ArrayParamStyle, { explodeFalse: string; explodeTrue: string }>
+  Record<ArrayParameterStyle, { explodeFalse: string; explodeTrue: string }>
 > = {
   simple: { explodeFalse: ",", explodeTrue: "," },
   label: { explodeFalse: ",", explodeTrue: "." },
@@ -24,13 +24,13 @@ const ARRAY_JOINER_BY_STYLE: Readonly<
   pipeDelimited: { explodeFalse: "|", explodeTrue: "&" }
 }
 
-const encodeValue = (value: Primitive, allowReserved: boolean): string => (
-  allowReserved ? String(value) : encodeURIComponent(String(value))
+const encodeValue = (value: Primitive, shouldAllowReserved: boolean): string => (
+  shouldAllowReserved ? String(value) : encodeURIComponent(String(value))
 )
 
 const formatExplodeFalse = (
   name: string,
-  style: ObjectParamStyle | ArrayParamStyle,
+  style: ObjectParameterStyle | ArrayParameterStyle,
   value: string
 ): string => {
   if (style === "simple") {
@@ -46,7 +46,7 @@ const formatExplodeFalse = (
 }
 
 const formatExplodeTrue = (
-  style: ObjectParamStyle | ArrayParamStyle,
+  style: ObjectParameterStyle | ArrayParameterStyle,
   joiner: string,
   value: string
 ): string => (
@@ -63,16 +63,16 @@ const toPrimitiveList = (value: Array<unknown>): Array<Primitive> => {
   return items
 }
 
-const getQueryEntries = (queryParams: unknown): Array<[string, unknown]> => (
-  isRecord(queryParams) ? Object.entries(queryParams) : []
+const getQueryEntries = (queryParameters: unknown): Array<[string, unknown]> => (
+  isRecord(queryParameters) ? Object.entries(queryParameters) : []
 )
 
 const toObjectPairs = (
   name: string,
   value: Record<string, unknown>,
-  allowReserved: boolean,
-  explode: boolean,
-  style: ObjectParamStyle
+  shouldAllowReserved: boolean,
+  shouldExplode: boolean,
+  style: ObjectParameterStyle
 ): Array<string> => {
   const entries: Array<string> = []
 
@@ -81,15 +81,15 @@ const toObjectPairs = (
       continue
     }
 
-    if (!explode) {
-      entries.push(key, encodeValue(rawValue, allowReserved))
+    if (!shouldExplode) {
+      entries.push(key, encodeValue(rawValue, shouldAllowReserved))
       continue
     }
 
     const nextName = style === "deepObject" ? `${name}[${key}]` : key
     entries.push(
-      serializePrimitiveParam(nextName, rawValue, {
-        allowReserved
+      serializePrimitiveParameter(nextName, rawValue, {
+        allowReserved: shouldAllowReserved
       })
     )
   }
@@ -100,31 +100,31 @@ const toObjectPairs = (
 const toArrayValues = (
   name: string,
   value: Array<unknown>,
-  style: ArrayParamStyle,
-  allowReserved: boolean,
-  explode: boolean
+  style: ArrayParameterStyle,
+  shouldAllowReserved: boolean,
+  shouldExplode: boolean
 ): Array<string> => {
   const entries: Array<string> = []
 
   for (const item of toPrimitiveList(value)) {
-    if (explode && style !== "simple" && style !== "label") {
+    if (shouldExplode && style !== "simple" && style !== "label") {
       entries.push(
-        serializePrimitiveParam(name, item, {
-          allowReserved
+        serializePrimitiveParameter(name, item, {
+          allowReserved: shouldAllowReserved
         })
       )
       continue
     }
 
-    entries.push(encodeValue(item, allowReserved))
+    entries.push(encodeValue(item, shouldAllowReserved))
   }
 
   return entries
 }
 
-const finalizeSerializedParam = (options: {
+const finalizeSerializedParameter = (options: {
   name: string
-  style: ObjectParamStyle | ArrayParamStyle
+  style: ObjectParameterStyle | ArrayParameterStyle
   explode: boolean
   values: Array<string>
   joinerWhenExplodeFalse: string
@@ -138,7 +138,7 @@ const finalizeSerializedParam = (options: {
     : formatExplodeFalse(options.name, options.style, serializedValue)
 }
 
-export const serializePrimitiveParam = (
+export const serializePrimitiveParameter = (
   name: string,
   value: Primitive,
   options?: { allowReserved?: boolean }
@@ -146,11 +146,11 @@ export const serializePrimitiveParam = (
   `${name}=${encodeValue(value, options?.allowReserved === true)}`
 )
 
-export const serializeObjectParam = (
+export const serializeObjectParameter = (
   name: string,
   value: unknown,
   options: {
-    style: ObjectParamStyle
+    style: ObjectParameterStyle
     explode: boolean
     allowReserved?: boolean
   }
@@ -167,7 +167,7 @@ export const serializeObjectParam = (
     options.style
   )
 
-  return finalizeSerializedParam({
+  return finalizeSerializedParameter({
     name,
     style: options.style,
     explode: options.explode,
@@ -177,11 +177,11 @@ export const serializeObjectParam = (
   })
 }
 
-export const serializeArrayParam = (
+export const serializeArrayParameter = (
   name: string,
   value: Array<unknown>,
   options: {
-    style: ArrayParamStyle
+    style: ArrayParameterStyle
     explode: boolean
     allowReserved?: boolean
   }
@@ -198,7 +198,7 @@ export const serializeArrayParam = (
     options.explode
   )
 
-  return finalizeSerializedParam({
+  return finalizeSerializedParameter({
     name,
     style: options.style,
     explode: options.explode,
@@ -212,26 +212,28 @@ const serializeQueryEntry = (
   name: string,
   value: unknown,
   options?: QuerySerializerOptions
-): string | undefined => {
+): string => {
   if (value === undefined || value === null) {
-    return
+    return ""
   }
 
-  return Array.isArray(value)
-    ? serializeArrayQueryEntry(name, value, options)
-    : serializeNonArrayQueryEntry(name, value, options)
+  if (Array.isArray(value)) {
+    return serializeArrayQueryEntry(name, value, options)
+  }
+
+  return serializeNonArrayQueryEntry(name, value, options)
 }
 
 const serializeArrayQueryEntry = (
   name: string,
   value: Array<unknown>,
   options?: QuerySerializerOptions
-): string | undefined => {
+): string => {
   if (value.length === 0) {
-    return
+    return ""
   }
 
-  return serializeArrayParam(name, value, {
+  return serializeArrayParameter(name, value, {
     style: "form",
     explode: true,
     ...options?.array,
@@ -243,9 +245,9 @@ const serializeNonArrayQueryEntry = (
   name: string,
   value: unknown,
   options?: QuerySerializerOptions
-): string | undefined => {
+): string => {
   if (isRecord(value)) {
-    return serializeObjectParam(name, value, {
+    return serializeObjectParameter(name, value, {
       style: "deepObject",
       explode: true,
       ...options?.object,
@@ -254,21 +256,21 @@ const serializeNonArrayQueryEntry = (
   }
 
   if (isPrimitive(value)) {
-    return serializePrimitiveParam(name, value, options)
+    return serializePrimitiveParameter(name, value, options)
   }
 
-  return undefined
+  return ""
 }
 
 export const createQuerySerializer = <T = unknown>(
   options?: QuerySerializerOptions
 ): QuerySerializer<T> =>
-(queryParams) => {
+(queryParameters) => {
   const serialized: Array<string> = []
 
-  for (const [name, value] of getQueryEntries(queryParams)) {
+  for (const [name, value] of getQueryEntries(queryParameters)) {
     const entry = serializeQueryEntry(name, value, options)
-    if (entry !== undefined) {
+    if (entry.length > 0) {
       serialized.push(entry)
     }
   }
