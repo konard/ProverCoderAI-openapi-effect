@@ -67,7 +67,7 @@ const listPetsProgram: Effect.Effect<Pets> = apiClient.GET("/pets", {
     UnexpectedStatus: ({ body, status }) => recoverWithEmptyPets(Console.log(`Unexpected status ${status}: ${body}`)),
     UnexpectedContentType: ({ actual, expected }) =>
       recoverWithEmptyPets(
-        Console.log(`Unexpected content type ${actual ?? "unknown"}; expected ${expected.join(", ")}`)
+        Console.log(`Unexpected content type ${actual ?? "missing"}; expected ${expected.join(", ")}`)
       ),
     ParseError: ({ error }) => recoverWithEmptyPets(Console.log(`Parse error: ${error.message}`)),
     DecodeError: ({ error }) => recoverWithEmptyPets(Console.log(`Decode error: ${error.message}`))
